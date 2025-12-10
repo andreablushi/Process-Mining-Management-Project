@@ -1,12 +1,12 @@
 import pm4py
-import pm4py.objects.log.obj as elem
+from pm4py.objects.log.obj import EventLog, Trace
 import pm4py.objects.conversion.log.converter as log_converter
 import pandas as pd
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import f1_score
 
-def import_log(file_path: str) -> elem.EventLog:
+def import_log(file_path: str) -> EventLog:
     """
         Import a XES log file and convert it to an EventLog object.
         Parameters:
@@ -18,11 +18,36 @@ def import_log(file_path: str) -> elem.EventLog:
     log = log_converter.apply(log, variant=log_converter.Variants.TO_EVENT_LOG, parameters={})
     return log
 
-def get_activity_names(log: elem.EventLog) -> list[str]:
+def create_prefixes_log(log: EventLog, prefix_length: int) -> EventLog:
+    """
+        Creates a new log object containing for each trace 
+        only the first 'prefix_length' events.
+        Parameters:
+            log (EventLog): The original event log object.
+            prefix_length (int): The length of the prefixes to extract.
+        Returns:
+            EventLog: The new event log object with prefixes.
+    """
+    prefixes_log = EventLog()
+    
+    for trace in log:
+        # Create a new trace for the prefix
+        prefix_trace = Trace()
+        # Set the attributes of the prefix trace to match the original trace
+        prefix_trace.attributes.update(trace.attributes)
+
+        # For each of the first 'prefix_length' events in the trace
+        for event in trace[:prefix_length]:
+            prefix_trace.append(event)
+        # Add the trace to the new log
+        prefixes_log.append(prefix_trace)
+    return prefixes_log
+
+def get_activity_names(log: EventLog) -> list[str]:
     '''
         Extract unique activity names from the event log.
         Parameters:
-            log (elem.EventLog): The event log object.
+            log (EventLog): The event log object.
         Returns:
             list[str]: A list of unique activity names.
     '''
@@ -50,11 +75,11 @@ def compute_columns(activity_names:list) -> list[str]:
     columns.append('label')
     return columns
 
-def boolean_encode(log:elem.EventLog, activity_names:list):
+def boolean_encode(log: EventLog, activity_names:list):
     '''
         Boolean encode the event log into a DataFrame.
         Parameters:
-            log (elem.EventLog): The event log object.
+            log (EventLog): The event log object.
             activity_names (list): List of activity names.
         Returns:
             pd.DataFrame: Boolean encoded DataFrame of the event log.
