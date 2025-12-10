@@ -71,7 +71,7 @@ dkms.conf
 notes/
 
 # Ignoring the data files
-data/
+logs/
 
 # Ignoring the binary files
 /bin
