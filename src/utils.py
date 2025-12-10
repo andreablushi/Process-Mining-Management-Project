@@ -181,13 +181,58 @@ def extract_recommendations(tree, feature_names, class_values, prefix_set):
     '''
     return 0
 
-def evaluate_recommendations(test_set, recommendations):
+def evaluate_recommendations(test_set: EventLog, recommendations:list) -> dict:
     '''
         Evaluate the recommendations against the test set.
             Parameters:
-                test_set: The test dataset.
-                recommendations: The recommendations to evaluate.
+                test_set(EventLog): The test dataset.
+                recommendations(list): The recommendations to evaluate.
             Returns:
-                float: The evaluation score.
+                dict: A dictionary containing evaluation metrics.
     '''
-    return 0
+    # Initialize confusion matrix components
+    true_positive = 0
+    false_positive = 0
+    true_negative = 0
+    false_negative = 0
+
+    for prefix_trace in test_set:
+        trace_id = prefix_trace.attributes["concept:name"]
+        ground_truth = prefix_trace.attributes["label"]
+        # Skip if there are no recommendations for this trace
+        if trace_id not in recommendations:
+            continue
+        # Get the recommended outcome for this trace
+        recommended_outcome = recommendations[trace_id]
+        # Get all the activities occured in the trace
+        trace_activities = set([event['concept:name'] for event in prefix_trace])
+        # Check if all recommended activities are followed in the trace
+        recommendation_followed = all(activity in trace_activities for activity in recommended_outcome['activities'])
+        # Calculating the confusion matrix components
+        if recommendation_followed and ground_truth == 'positive':
+            true_positive += 1
+        elif recommendation_followed and ground_truth == 'negative':
+            false_positive += 1
+        elif not recommendation_followed and ground_truth == 'negative':
+            true_negative += 1
+        elif not recommendation_followed and ground_truth == 'positive':
+            false_negative += 1 
+
+        # Calculate evaluation metrics
+        total = true_positive + true_negative + false_positive + false_negative
+        # Precision 
+        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
+        # Recall
+        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
+        # Accuracy
+        accuracy = (true_positive + true_negative) / total if total > 0 else 0
+        # F1-Score
+        f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        # Group metrics into a dictionary
+        metrics = {
+            'precision': precision,
+            'recall': recall,
+            'accuracy': accuracy,
+            'f1_score': f1_score
+        }
+    return metrics
