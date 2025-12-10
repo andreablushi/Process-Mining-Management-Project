@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+# venv folder
+/.venv/
+
 # Object files
 */obj/
 */dep/
