@@ -1,4 +1,31 @@
-## Installation and setup
+# Process Mining and Management Project
+
+Implementation of **predictive process monitoring** and **prescriptive recommendations** using DecisionTrees with boolean encoding.
+
+The project was developed as part of the course "Process Mining and Management", held by Prof. Chiara Di Francescomarino at the University of Trento, Master's Degree in Computer Science
+
+[View Full Report (PDF)](docs/report.pdf)
+
+
+## Table of Contents
+
+* [1. Repository Structure](#1-repository-contents)
+* [2. Installation and setup](#2-installation-and-setup)
+
+## 1. Repository Contents
+
+- **src/**:  Source code modules
+   - **utils.py**: Core utilities (log processing, encoding, hyperparameter optimization)
+   - **plotting.py**: Visualization functions (decision trees, confusion matrices, metrics)
+- **logs/**: Event log files (XES format)
+- **docs/**: Documentation and outputs
+   - **media/**: Generated visualizations
+   - **LaTeX/**: LaTeX report files
+   - **report.pdf**: Final report of the project (PDF)
+- **notebook.ipynb**: Main Jupyter Notebook for experiments
+- **requirements.txt**: Python dependencies
+
+## 2. Installation and setup
 To install and set up the project, follow these steps:
 
 1. Clone the repository:

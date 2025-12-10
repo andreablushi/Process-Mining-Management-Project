@@ -30,35 +30,6 @@
 *.la
 *.lo
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
 #Gitignore for LaTeX projects
 *.aux
 *.fdb_latexmk
@@ -73,23 +44,8 @@ dkms.conf
 .DS_Store
 notes/
 
-# Ignoring the data files
-logs/
-
-# Ignoring the binary files
-/bin
 # IDE files
 .vscode/
-# Test files
-/test
 # Ignore personal files
 idea/
-# Ignore python notebook files
-/tools/dataElaboration/.ipynb_checkpoints
-/tools/dataElaboration/__pycache__
-tools/dataElaboration/tmp.ipynb
-# Ignore temporary jobs file
-/file
-tools/__pycache__/__init__.cpython-313.pyc
-.ipynb_checkpoints/elaborate_data-checkpoint.ipynb
-.ipynb_checkpoints/main-checkpoint.ipynb
+
