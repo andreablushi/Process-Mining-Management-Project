@@ -27,14 +27,14 @@ def get_activity_names(log: elem.EventLog) -> list[str]:
             list[str]: A list of unique activity names.
     '''
     activity_names=[]
-    # Iterate through each case and event to collect activity names
-    for case in log:
-        for event in case:
+    # Iterate through each trace and event to collect activity names
+    for trace in log:
+        for event in trace:
             activity_names.append(event['concept:name'])
     # Remove duplicates while preserving order
     return sorted(set(activity_names), key=lambda x:activity_names.index(x))
 
-def compute_columns(activity_names:list):
+def compute_columns(activity_names:list) -> list[str]:
     '''
         Compute the column names for the dataset based on activity names.
         Parameters:
@@ -42,10 +42,10 @@ def compute_columns(activity_names:list):
         Returns:
             list: List of column names including 'trace_id', activity names, and 'label'.
     '''
-    # Start with 'trace_id' column which identifies each trace
-    columns =['trace_id']
-    # Add activity names of the log
-    columns+=activity_names
+    # Start with 'trace_id' column
+    columns = ['trace_id']
+    # Add the found activity names as columns
+    columns += activity_names
     # Add 'label' column for ground truth
     columns.append('label')
     return columns
