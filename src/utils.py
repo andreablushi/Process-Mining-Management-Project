@@ -266,11 +266,13 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
                 prefix_set: Set of prefixes to extract recommendations for.
             Returns:
                 dict: A dictionary mapping prefixes to their recommendations.
+                if the prefix is already positive, the recommendation is an empty set.
+                Otherwise, where possible, it contains the missing activities to reach a positive outcome.
     '''
     recommendation = {}
 
-    logging.info("Extracting recommendations from the decision tree.")
     # Extract the positive paths from the decision tree
+    logging.info("Extracting recommendations from the decision tree.")
     paths = get_positive_paths(tree, feature_names)
     logging.info(f"Total positive paths extracted: {len(paths)}")
     for p in paths:
@@ -282,6 +284,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
 
         # Skip all the positive traces
         if prefix_trace.get('predicted_label') == 'true':
+            recommendation[(frozenset({k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v != False}), set())]
             logging.debug(f"Skipping positive trace: {prefix_trace.get('trace_id')}, predicted_label = {prefix_trace.get('predicted_label')}")
             continue
 
