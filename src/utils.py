@@ -9,13 +9,16 @@ from sklearn.tree import DecisionTreeClassifier, _tree
 from sklearn.metrics import f1_score
 from src.plotting import path_to_rule
 
-# Configure logging
+# Configure root logger
 logging.basicConfig(
     filename='app.log',
-    filemode='w',       # replace the log file on each run
-    level=logging.DEBUG,       
+    filemode='w',
+    level=logging.WARNING,  # Set root to WARNING. Suppressing other libraries root
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+# Create and configure your application's logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 def import_log(file_path: str) -> EventLog:
     """
@@ -25,8 +28,10 @@ def import_log(file_path: str) -> EventLog:
         Returns:
             elem.EventLog: The imported event log object.
     """
+    logger.info(f"Importing log from file: {file_path}")
     log = pm4py.read_xes(file_path)
     log = log_converter.apply(log, variant=log_converter.Variants.TO_EVENT_LOG, parameters={})
+    logger.info(f"Log imported successfully with {len(log)} traces.")
     return log
 
 def create_prefixes_log(log: EventLog, prefix_length: int) -> EventLog:
@@ -39,6 +44,7 @@ def create_prefixes_log(log: EventLog, prefix_length: int) -> EventLog:
         Returns:
             EventLog: The new event log object with prefixes.
     """
+    logger.info(f"Creating prefixes log with prefix length: {prefix_length}")
     prefixes_log = EventLog()
     
     for trace in log:
@@ -52,6 +58,7 @@ def create_prefixes_log(log: EventLog, prefix_length: int) -> EventLog:
             prefix_trace.append(event)
         # Add the trace to the new log
         prefixes_log.append(prefix_trace)
+    logger.info(f"Prefixes log created successfully with {len(prefixes_log)} traces.")
     return prefixes_log
 
 def get_activity_names(log: EventLog) -> list[str]:
@@ -62,6 +69,7 @@ def get_activity_names(log: EventLog) -> list[str]:
         Returns:
             list[str]: A list of unique activity names.
     '''
+    logger.info("Extracting activity names from log.")
     activity_names=[]
     # Iterate through each trace and event to collect activity names
     for trace in log:
@@ -95,6 +103,7 @@ def boolean_encode(log: EventLog, activity_names:list):
         Returns:
             pd.DataFrame: Boolean encoded DataFrame of the event log.
     '''
+    logger.info("Creating boolean encoding")
     encoded_log = []
     # Build column names
     columns = compute_columns(activity_names)
@@ -273,11 +282,11 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
     recommendation = {}
 
     # Extract the positive paths from the decision tree
-    logging.info("Extracting recommendations from the decision tree.")
+    logger.info("Extracting recommendations from the decision tree.")
     paths = get_positive_paths(tree, feature_names)
-    logging.info(f"Total positive paths extracted: {len(paths)}")
+    logger.info(f"Total positive paths extracted: {len(paths)}")
     for p in paths:
-        logging.debug(f"Positive Path: {path_to_rule(p[0])} with confidence {p[1]}")
+        logger.debug(f"Positive Path: {path_to_rule(p[0])} with confidence {p[1]}")
     
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
@@ -289,19 +298,19 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             recommendation[true_prefix] = set()
             continue
 
-        logging.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
+        logger.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
         # Keep for each trace only the true-valued activity
         prefix_trace_features = {
             k: v for k, v in prefix_trace.items()
             if k != 'predicted_label' and k != 'trace_id' and v != False
         }
-        logging.debug(f"Prefix Trace Features: {prefix_trace_features}")
+        logger.debug(f"Prefix Trace Features: {prefix_trace_features}")
         
         # Get the compliant paths for the current prefix_trace
         compliant_paths = get_compliant_paths(paths, prefix_trace_features)
-        logging.debug(f"Number of compliant paths found: {len(compliant_paths)}")
+        logger.debug(f"Number of compliant paths found: {len(compliant_paths)}")
         for cp in compliant_paths:
-            logging.debug(f"Compliant Path: {path_to_rule(cp[0])}, with confidence {cp[1]}")
+            logger.debug(f"Compliant Path: {path_to_rule(cp[0])}, with confidence {cp[1]}")
 
         # If no compliant path is found, we can continue
         if not compliant_paths:
@@ -309,7 +318,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             continue
 
         best_path, confidence = max(compliant_paths, key=lambda path: path[1])
-        logging.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
+        logger.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
 
         # Extract missing conditions
         missing_conditions = {
@@ -321,7 +330,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         recommendation[frozenset(prefix_trace_features)] = missing_conditions
 
     for k, v in recommendation.items():
-        logging.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
+        logger.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
     
     return recommendation
         
@@ -370,7 +379,7 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
         
         if not recommendation_found:
             # If no recommendation was made for this trace, skip it in evaluation
-            logging.debug(f"Trace ID: {trace_id} has no recommendation. Skipping.")
+            logger.debug(f"Trace ID: {trace_id} has no recommendation. Skipping.")
             continue
         
         evaluated_traces += 1
@@ -392,7 +401,7 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
                     recommendation_followed = False
                     break
 
-        logging.debug(f"Trace ID: {trace_id}, Ground Truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
+        logger.debug(f"Trace ID: {trace_id}, Ground Truth: {ground_truth}, Recommendation Followed: {recommendation_followed}")
 
         # Classify based on the criteria
         if recommendation_followed and ground_truth == 'true':

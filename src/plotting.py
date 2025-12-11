@@ -4,17 +4,30 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 
-
 def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:bool=False):
-    '''
-        Plot the decision tree using matplotlib.
-        Parameters:
-            tree (tree.DecisionTreeClassifier): The decision tree classifier to plot.
-    '''
-    plot.figure(figsize=(30,20))
-    tree_plot = tree.plot_tree(clf, filled=True, feature_names=activity_names, rounded=True)
+    """
+    Plot the decision tree with confidence levels (probability of positive class) shown.
+    
+    Parameters:
+        clf: DecisionTreeClassifier
+        activity_names: List of feature names
+        save: Whether to save the plot as PNG
+    """
+    # Use plot_tree with proportion=True to show probabilities, and custom labels
+    plot.figure(figsize=(30, 20))
+    tree.plot_tree(
+        clf,
+        feature_names=activity_names,
+        filled=True,
+        rounded=True,
+        proportion=True,
+        label='all',  
+    )
+
+    # Optionally save the figure
     if save:
-        plot.savefig("docs/media/decision_tree.png")
+        plot.savefig("docs/media/decision_tree.png", bbox_inches='tight')
+    plot.show()
 
 def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=False): 
     '''
