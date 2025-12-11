@@ -117,7 +117,7 @@ def boolean_encode(log: EventLog, activity_names:list):
         encoded_log.append(encoded_row)
     return pd.DataFrame(columns=columns, data=encoded_log)
 
-def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100) -> dict:
+def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, space:dict=None) -> dict:
     '''
         Hyperparameter optimization for Decision Tree Classifier using Hyperopt.
         Parameters:
@@ -154,10 +154,11 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100) ->
         return fmeasure_model(params)
 
     # Define the hyperparameter search space
-    space = {
-        'max_depth': hp.choice('max_depth', range(1, 400)),
-        'max_features': hp.choice('max_features', range(1, 448)),
-        'criterion': hp.choice('criterion', ['gini', 'entropy']),
+    if space is None:
+        space = {
+            'max_depth': hp.choice('max_depth', range(1, 400)),
+            'max_features': hp.choice('max_features', range(1, 448)),
+            'criterion': hp.choice('criterion', ['gini', 'entropy']),
         'random_state': 42
     }
 
