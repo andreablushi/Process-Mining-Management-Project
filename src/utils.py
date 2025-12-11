@@ -314,41 +314,59 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             if feat not in prefix_trace_features
         }
 
-        recommendation[frozenset(prefix_trace_features)] = missing_conditions
+        recommendation[row['trace_id']] = missing_conditions
+        print(f"Prefix Trace: {set(prefix_trace_features.keys())} -> Recommended Activities: {missing_conditions}")
 
     for k, v in recommendation.items():
         logging.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
     
     return recommendation
         
-def evaluate_recommendations(test_set: EventLog, recommendations:list) -> dict:
-    '''
-        Evaluate the recommendations against the test set.
-            Parameters:
-                test_set(EventLog): The test dataset.
-                recommendations(list): The recommendations to evaluate.
-            Returns:
-                dict: A dictionary containing evaluation metrics.
-    '''
-    # Initialize confusion matrix components
+def evaluate_recommendations(test_set:pd.DataFrame, recommendations: dict) -> dict:
+    """
+    Evaluate the recommendations against the test set.
+    test_set must be an EventLog.
+    recommendations maps trace_id -> set of (feature, boolean).
+    """
+
     true_positive = 0
     false_positive = 0
     true_negative = 0
     false_negative = 0
 
-    for prefix_trace in test_set:
-        trace_id = prefix_trace.attributes["concept:name"]
-        ground_truth = prefix_trace.attributes["label"]
-        # Skip if there are no recommendations for this trace
+    for _, row in test_set.iterrows():
+        trace_id = row["trace_id"]
+        ground_truth = row["label"]
+
+        # Skip if we have no recommendations for this trace
         if trace_id not in recommendations:
+            print(f"No recommendations for trace {trace_id}")
             continue
-        # Get the recommended outcome for this trace
-        recommended_outcome = recommendations[trace_id]
-        # Get all the activities occured in the trace
-        trace_activities = set([event['concept:name'] for event in prefix_trace])
-        # Check if all recommended activities are followed in the trace
-        recommendation_followed = all(activity in trace_activities for activity in recommended_outcome['activities'])
-        # Calculating the confusion matrix components
+        print(f"Evaluating trace {trace_id} with ground truth {ground_truth}")
+        recommended_conditions = recommendations[trace_id]
+
+        # Convert (activity, boolean) into just activity names
+        recommended_dict = dict(recommended_conditions)  # feature -> boolean
+        recommendation_followed = all(
+            row.get(feat, False) == val for feat, val in recommended_dict.items()
+        )
+        print(f"Done conditions:{row.to_dict()}")
+        print(f"Recommended conditions: {recommended_conditions}, Followed: {recommendation_followed}")
+        # All activities that actually happened in the trace
+        trace_activities = {
+            col
+            for col, value in row.items()
+            if col not in ["trace_id", "label", "predicted_label"]
+            and isinstance(value, (bool, int, float))
+            and value is True
+        }
+
+        recommended_activities = {feat for feat, val in recommended_conditions if val is True}
+
+        # Check whether all recommended activities appeared in the trace
+        recommendation_followed = all(a in trace_activities for a in recommended_activities)
+
+        # Update confusion matrix
         if recommendation_followed and ground_truth == 'positive':
             true_positive += 1
         elif recommendation_followed and ground_truth == 'negative':
@@ -356,23 +374,19 @@ def evaluate_recommendations(test_set: EventLog, recommendations:list) -> dict:
         elif not recommendation_followed and ground_truth == 'negative':
             true_negative += 1
         elif not recommendation_followed and ground_truth == 'positive':
-            false_negative += 1 
+            false_negative += 1
 
-        # Calculate evaluation metrics
-        total = true_positive + true_negative + false_positive + false_negative
-        # Precision 
-        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
-        # Recall
-        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
-        # Accuracy
-        accuracy = (true_positive + true_negative) / total if total > 0 else 0
-        # F1-Score
-        f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        # Group metrics into a dictionary
-        metrics = {
-            'precision': precision,
-            'recall': recall,
-            'accuracy': accuracy,
-            'f1_score': f1_score
-        }
-    return metrics
+    # Compute evaluation metrics
+    total = true_positive + true_negative + false_positive + false_negative
+
+    precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
+    recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
+    accuracy = (true_positive + true_negative) / total if total > 0 else 0
+    f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    return {
+        'precision': precision,
+        'recall': recall,
+        'accuracy': accuracy,
+        'f1_score': f1
+    }
