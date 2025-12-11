@@ -284,8 +284,8 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
 
         # Skip all the positive traces
         if prefix_trace.get('predicted_label') == 'true':
-            recommendation[(frozenset({k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v != False}), set())]
-            logging.debug(f"Skipping positive trace: {prefix_trace.get('trace_id')}, predicted_label = {prefix_trace.get('predicted_label')}")
+            true_prefix = frozenset({k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v})
+            recommendation[true_prefix] = set()
             continue
 
         logging.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
