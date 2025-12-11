@@ -160,7 +160,8 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100) ->
     best_params = {
         'max_depth': best['max_depth'] + 1,  # +1 because range starts from 1
         'max_features': best['max_features'] + 1,  # +1 because range starts from 1
-        'criterion': criterion_options[best['criterion']]
+        'criterion': criterion_options[best['criterion']],
+        'random_state': 42
     }
     # Print the best hyperparameters
     print("Best hyperparameters:")
