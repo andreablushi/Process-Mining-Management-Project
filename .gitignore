@@ -49,3 +49,4 @@ notes/
 # Ignore personal files
 idea/
 
+.ipynb_checkpoints/notebook-checkpoint.ipynb

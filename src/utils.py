@@ -1,4 +1,5 @@
 import pm4py
+import logging
 from pm4py.objects.log.obj import EventLog, Trace
 import pm4py.objects.conversion.log.converter as log_converter
 import pandas as pd
@@ -6,6 +7,15 @@ import numpy as np
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from sklearn.tree import DecisionTreeClassifier, _tree
 from sklearn.metrics import f1_score
+from src.plotting import path_to_rule
+
+# Configure logging
+logging.basicConfig(
+    filename='app.log',
+    filemode='w',       # replace the log file on each run
+    level=logging.DEBUG,       
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def import_log(file_path: str) -> EventLog:
     """
@@ -180,8 +190,8 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
                 feature_names: List of feature names used in the model.
                 positive_class_value: The class value considered as positive (true).
             Returns:
-                list: A list of positive paths, where each path is represented as a list
-                of tuples (feature_name, condition). 
+                list of tuples: [(path_conditions, confidence), ...]
+                where path_conditions is a list of (feature_name, boolean_value)
     '''
     tree_ = tree.tree_
     paths = []
@@ -203,11 +213,16 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
             DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, False)])
             DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, True)])
         else:
-            # We are in a leaf node, check the predicted class
+            # Leaf node: check the predicted class
             predicted_class = bool(np.argmax(tree_.value[node][0]))
-            # If the prediction is positive, store the path
+            
+            # If the prediction is positive, compute confidence and store the path
             if predicted_class:
-                paths.append(current_path)
+                values = tree_.value[node][0]
+                total_samples = sum(values)
+                positive_samples = values[1]  # assuming positive class is index 1
+                confidence = positive_samples / total_samples if total_samples > 0 else 0.0
+                paths.append((current_path, confidence))
             return
     # Start the recursive DFS traversal, with an empty path
     DFS_traverse_tree(0, [])
@@ -228,7 +243,7 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
         match = True
         
         # For each condition in the path
-        for feature_name, boolean_value in path:
+        for feature_name, boolean_value in path[0]:
             if feature_name in prefix_trace:
                 # If the condition is not satisfied, mark the path as non-compliant and break
                 if prefix_trace[feature_name] != boolean_value:
@@ -240,82 +255,6 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
         if match:
             compliant_paths.append(path)
     return compliant_paths
-
-def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier, feature_names: list) -> tuple:
-    '''
-        Find the compliant path with the highest confidence.
-            Parameters:
-                compliant_paths: A list of compliant paths.
-                tree: The decision tree model.
-                feature_names: List of feature names used in the model.
-                class_values: List of possible class values [negative_value, positive_value].
-            Returns:
-                tuple: (best_path, confidence) - The compliant path with the highest confidence and its confidence score.
-    '''
-    if not compliant_paths:
-        return None, 0.0
-    
-    best_path = None
-    highest_confidence = -1.0
-
-    for path in compliant_paths:
-        node = 0
-        valid_traversal = True
-        
-        # Traverse the tree to find the leaf node corresponding to the path
-        for feature_name, boolean_value in path:
-            # Check if we've reached a leaf node prematurely
-            if tree.tree_.feature[node] == _tree.TREE_UNDEFINED:
-                print("Error in the path!")
-                valid_traversal = False
-                break
-            
-            # Get the feature index
-            feature_index = feature_names.index(feature_name)
-            
-            # Check if current node's feature matches
-            if tree.tree_.feature[node] == feature_index:
-                # Follow the appropriate branch based on boolean_value
-                if boolean_value: 
-                    node = tree.tree_.children_right[node]
-                else:
-                    node = tree.tree_.children_left[node]
-            else:
-                print("Invalid Path:")
-                # Feature mismatch - this shouldn't happen for valid paths
-                valid_traversal = False
-                break
-        
-        if not valid_traversal:
-            continue
-
-        # Get the confidence of the prediction at the leaf node. It is defined as TRUE / #ELEMENTS
-        value = tree.tree_.value[node]
-        total_samples = sum(value[0])
-        # The positive samples are index 1
-        positive_samples = value[0][1]  
-        confidence = positive_samples / total_samples
-
-        # Update the best path if this one has higher confidence
-        if confidence > highest_confidence:
-            highest_confidence = confidence
-            best_path = path
-
-    return best_path, highest_confidence
-
-def path_to_rule(path):
-    '''
-        Convert a path from the decision tree to a human-readable rule.
-        Each node condition (feature_name operator threshold) is combined using AND to form the rule.
-            Parameters:
-                path: A list of triples (feature_name, operator, threshold) representing the path.
-            Returns:
-                str: A human-readable rule in the form of a boolean expression.
-    '''
-    rule = []
-    for feature_name, boolean_value in path:
-        rule.append(f"{feature_name} == {boolean_value}")
-    return " AND ".join(rule)
 
 def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> dict:
     '''
@@ -329,31 +268,45 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
                 dict: A dictionary mapping prefixes to their recommendations.
     '''
     recommendation = {}
+
+    logging.info("Extracting recommendations from the decision tree.")
     # Extract the positive paths from the decision tree
     paths = get_positive_paths(tree, feature_names)
-
+    logging.info(f"Total positive paths extracted: {len(paths)}")
+    for p in paths:
+        logging.debug(f"Positive Path: {path_to_rule(p[0])} with confidence {p[1]}")
+    
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
         prefix_trace = row.to_dict()
 
         # Skip all the positive traces
         if prefix_trace.get('predicted_label') == 'true':
+            logging.debug(f"Skipping positive trace: {prefix_trace.get('trace_id')}, predicted_label = {prefix_trace.get('predicted_label')}")
             continue
-        
+
+        logging.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
         # Keep for each trace only the true-valued activity
         prefix_trace_features = {
             k: v for k, v in prefix_trace.items()
             if k != 'predicted_label' and k != 'trace_id' and v != False
         }
-
+        logging.debug(f"Prefix Trace Features: {prefix_trace_features}")
+        
         # Get the compliant paths for the current prefix_trace
         compliant_paths = get_compliant_paths(paths, prefix_trace_features)
+        logging.debug(f"Number of compliant paths found: {len(compliant_paths)}")
+        for cp in compliant_paths:
+            logging.debug(f"Compliant Path: {path_to_rule(cp[0])}, with confidence {cp[1]}")
+
         # If no compliant path is found, we can continue
         if not compliant_paths:
-            recommendation[row['trace_id']] = set()
+            recommendation[prefix_trace.get('trace_id')] = set()
             continue
 
-        best_path, _ = get_best_compliant_path(compliant_paths, tree, feature_names)
+        best_path, confidence = max(compliant_paths, key=lambda path: path[1])
+        logging.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
+
         # Extract missing conditions
         missing_conditions = {
             (feat, val)
@@ -364,7 +317,8 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         recommendation[frozenset(prefix_trace_features)] = missing_conditions
 
     for k, v in recommendation.items():
-        print(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
+        logging.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
+    
     return recommendation
         
 def evaluate_recommendations(test_set: EventLog, recommendations:list) -> dict:

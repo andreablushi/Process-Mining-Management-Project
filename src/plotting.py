@@ -5,7 +5,7 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 
 
-def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list):
+def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:bool=False):
     '''
         Plot the decision tree using matplotlib.
         Parameters:
@@ -13,9 +13,10 @@ def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list):
     '''
     plot.figure(figsize=(30,20))
     tree_plot = tree.plot_tree(clf, filled=True, feature_names=activity_names, rounded=True)
-    plot.savefig("docs/media/decision_tree.png")
+    if save:
+        plot.savefig("docs/media/decision_tree.png")
 
-def plot_confusion_matrix(true_labels: list, predicted_labels: list): 
+def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=False): 
     '''
         Plot the confusion matrix using matplotlib.
         Parameters:
@@ -23,7 +24,8 @@ def plot_confusion_matrix(true_labels: list, predicted_labels: list):
             predicted_labels: The predicted labels from the model.
     '''
     cm_display = ConfusionMatrixDisplay.from_predictions(true_labels, predicted_labels, cmap=plot.cm.Blues)
-    cm_display.figure_.savefig("docs/media/confusion_matrix.png")
+    if save:
+        cm_display.figure_.savefig("docs/media/confusion_matrix.png")
 
 def compute_all_metrics(true_labels: list, predicted_labels: list):
     '''
@@ -58,3 +60,17 @@ def print_recommendations_metrics(recommendations_metrics: dict):
     print("Recommendations Evaluation Metrics:")
     for metric, value in recommendations_metrics.items():
         print(f"{metric.capitalize()}: {value*100:.2f}%")
+
+def path_to_rule(path):
+    '''
+        Convert a path from the decision tree to a human-readable rule.
+        Each node condition (feature_name operator threshold) is combined using AND to form the rule.
+            Parameters:
+                path: A list of triples (feature_name, operator, threshold) representing the path.
+            Returns:
+                str: A human-readable rule in the form of a boolean expression.
+    '''
+    rule = []
+    for feature_name, boolean_value in path:
+        rule.append(f"{feature_name} == {boolean_value}")
+    return " AND ".join(rule)
