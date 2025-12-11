@@ -317,7 +317,11 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
             recommendation[prefix_trace.get('trace_id')] = set()
             continue
 
-        best_path, confidence = max(compliant_paths, key=lambda path: path[1])
+        # Pick the path with highest confidence, break ties by shortest length
+        best_path, confidence = max(
+            compliant_paths,
+            key=lambda x: (x[1], -len(x[0]))  # x[1] = confidence, x[0] = path list
+        )
         logger.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
 
         # Extract missing conditions
