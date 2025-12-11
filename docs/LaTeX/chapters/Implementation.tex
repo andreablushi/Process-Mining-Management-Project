@@ -25,8 +25,7 @@ Upon completion, we obtained a DataFrame where each row represented a trace and 
 After encoding the pruned event log, a decision tree classifier was trained using the \textit{scikit-learn} library.  
 We split the encoded log into features (by removing the trace identifier and label columns from the original encoding) and labels, which were the ground truth extracted directly from the log.  
 The \textit{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
-\\\\
-After evaluating the classifier on the test set, we visualized the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
+
 \subsection{Optimizing the Classifier hyperparameters}
 To enhance the performance of our decision tree classifier, we employed the \textit{Hyperopt} library to perform hyperparameter optimization.
 This tool systematically iterates through various combinations of hyperparameters, such as maximum tree depth, maximum features, and criterion (e.g., Gini or entropy), to identify the configuration that yields the optimal performance.
@@ -37,7 +36,8 @@ The Hyperopt library also allows us to define a search space and to specify the 
 \subsection{Generating Predictions}
 After training the classifier, we used it to generate predictions on the test set. 
 The predicted labels were obtained by applying the trained model to the feature set derived from the encoded test log.
-%#TODO: complete here
+Those feature were cleaned by removing the trace identifier and ground truth label columns, similar to the training phase.
+Then we evaluated the classifier's performance using standard metrics such as accuracy, precision, recall, and F1-score, provided by the \textit{scikit-learn} library.
 
 \subsection{Extracting Recommendations}
 Given the predictions obtained from the decision tree classifier, using the transparent structure of the tree, 
