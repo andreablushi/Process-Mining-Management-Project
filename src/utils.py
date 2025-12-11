@@ -252,7 +252,6 @@ def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier,
             Returns:
                 tuple: (best_path, confidence) - The compliant path with the highest confidence and its confidence score.
     '''
-    print("Best_compliant_path")
     if not compliant_paths:
         return None, 0.0
     
@@ -277,15 +276,10 @@ def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier,
             # Check if current node's feature matches
             if tree.tree_.feature[node] == feature_index:
                 # Follow the appropriate branch based on boolean_value
-                if boolean_value == class_values[0]:  # Left child (e.g., 'false')
-                    node = tree.tree_.children_left[node]
-                elif boolean_value == class_values[1]:  # Right child (e.g., 'true')
+                if boolean_value: 
                     node = tree.tree_.children_right[node]
                 else:
-                    print("Ivalid Path")
-                    # Invalid boolean value
-                    valid_traversal = False
-                    break
+                    node = tree.tree_.children_left[node]
             else:
                 print("Invalid Path:")
                 # Feature mismatch - this shouldn't happen for valid paths
@@ -337,9 +331,6 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
     recommendation = {}
     # Extract the positive paths from the decision tree
     paths = get_positive_paths(tree, feature_names)
-    print("Paths:")
-    for p in paths:
-        path_to_rule(p)
 
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
@@ -349,18 +340,32 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         if prefix_trace.get('predicted_label') == 'true':
             continue
         
-        # Filter only the actual activities done in the trace
-        prefix_trace_features = {k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v != False}
+        # Keep for each trace only the true-valued activity
+        prefix_trace_features = {
+            k: v for k, v in prefix_trace.items()
+            if k != 'predicted_label' and k != 'trace_id' and v != False
+        }
+
         # Get the compliant paths for the current prefix_trace
         compliant_paths = get_compliant_paths(paths, prefix_trace_features)
+        # If no compliant path is found, we can continue
+        if not compliant_paths:
+            recommendation[row['trace_id']] = set()
+            continue
 
-        # If there is at least one compliant path
-        if compliant_paths:
-            print("AAAAAAAAAAA")
-            # Find the path with the highest confidence
-            best_path, _ = get_best_compliant_path(compliant_paths, tree, feature_names)
-            
-    return 0
+        best_path, _ = get_best_compliant_path(compliant_paths, tree, feature_names)
+        # Extract missing conditions
+        missing_conditions = {
+            (feat, val)
+            for (feat, val) in best_path
+            if feat not in prefix_trace_features
+        }
+
+        recommendation[frozenset(prefix_trace_features)] = missing_conditions
+
+    for k, v in recommendation.items():
+        print(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
+    return recommendation
         
 def evaluate_recommendations(test_set: EventLog, recommendations:list) -> dict:
     '''
