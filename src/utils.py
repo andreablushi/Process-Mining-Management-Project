@@ -229,27 +229,19 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
         
         # For each condition in the path
         for feature_name, boolean_value in path:
-            # Check if the feature exists in the prefix_trace
-            if feature_name not in prefix_trace:
-                print(f"{feature_name} not in {prefix_trace}")
-                match = False
-                break
+            if feature_name in prefix_trace:
+                # If the condition is not satisfied, mark the path as non-compliant and break
+                if prefix_trace[feature_name] != boolean_value:
+                    #print(f"{feature_name}: {boolean_value} != {prefix_value} -> Discarded trace")
+                    match = False
+                    break
 
-            # Get the value of the current feature from the prefix_trace
-            prefix_value = prefix_trace[feature_name]
-            # If the condition is not satisfied, mark the path as non-compliant and break
-            if boolean_value != prefix_value:
-                print(f"{feature_name}: {boolean_value} != {prefix_value} -> Discarded trace")
-                match = False
-                break
-        
         # If the path is compliant, add it to the list
         if match:
-            print("Match found!")
             compliant_paths.append(path)
     return compliant_paths
 
-def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier, feature_names: list, class_values: list) -> tuple:
+def get_best_compliant_path(compliant_paths: list, tree: DecisionTreeClassifier, feature_names: list) -> tuple:
     '''
         Find the compliant path with the highest confidence.
             Parameters:
@@ -352,7 +344,8 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
         prefix_trace = row.to_dict()
-        # Only process negative cases
+
+        # Skip all the positive traces
         if prefix_trace.get('predicted_label') == 'true':
             continue
         
@@ -365,7 +358,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         if compliant_paths:
             print("AAAAAAAAAAA")
             # Find the path with the highest confidence
-            best_path, _ = get_best_compliant_path(compliant_paths, tree, feature_names, class_values)
+            best_path, _ = get_best_compliant_path(compliant_paths, tree, feature_names)
             
     return 0
         
