@@ -189,8 +189,8 @@ def hyperparameter_optimization(encoded_data:pd.DataFrame, max_evals:int=100, sp
             'max_depth': hp.choice('max_depth', range(1, 400)),
             'max_features': hp.choice('max_features', range(1, 448)),
             'criterion': hp.choice('criterion', ['gini', 'entropy']),
-        'random_state': 42
-    }
+            'random_state': 42
+        }
 
     # Run hyperparameter optimization
     trials = Trials()
