@@ -82,7 +82,9 @@ def get_activity_names(log: EventLog) -> list[str]:
         for event in trace:
             activity_names.append(event['concept:name'])
     # Remove duplicates while preserving order
-    return sorted(set(activity_names), key=lambda x:activity_names.index(x))
+    activity_names = sorted(set(activity_names), key=lambda x:activity_names.index(x))
+    logger.debug(f"Extracted activity names: {activity_names}")
+    return activity_names
 
 def compute_columns(activity_names:list) -> list[str]:
     '''
@@ -226,10 +228,8 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
                 positive_class_value: The class value considered as positive (true).
             Returns:
                 list of tuples: [(path_conditions, confidence), ...]
-                where path_conditions is a list of tuples (feature_name, boolean_value)
-        
-        TODO: refactor this, adding the support for prefix_length conditions in the path. We should restore the old
-        path definition (feature, operator, value)
+                where path_conditions is a list of tuples (feature_name, boolean_value) or 
+                (prefix_lenght, {<=, >}, threshold)
     '''
     logger.info("Extracting positive paths from the decision tree.")
     tree_ = tree.tree_
@@ -248,7 +248,7 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
             # Base case: leaf node
             # Check the predicted class
             predicted_class = bool(np.argmax(tree_.value[node][0]))
-            
+    
             # If the prediction is positive, compute confidence and store the path
             if predicted_class:
                 values = tree_.value[node][0]
@@ -264,6 +264,14 @@ def get_positive_paths(tree: DecisionTreeClassifier, feature_names: list) -> lis
             # Get the feature name for the current node
             feature_name = feature_names[tree_.feature[node]]
 
+            # Check if the feature is 'prefix_length' to handle it differently
+            if feature_name == 'prefix_length':
+                threshold = tree_.threshold[node]
+                # Left child: value <= threshold
+                DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, '<=', threshold)]) 
+                # Right child: value > threshold
+                DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, '>', threshold)]) 
+                return
             # Recursively traverse both the left and right child nodes
             DFS_traverse_tree(tree_.children_left[node], current_path + [(feature_name, False)]) # Taking the left path: the feature is not present
             DFS_traverse_tree(tree_.children_right[node], current_path + [(feature_name, True)]) # Taking the right path: the feature is present
@@ -282,7 +290,6 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
                 prefix_trace: A dictionary representing only the activity done in the prefix trace.
             Returns:
                 list: filter list of paths, containing only the compliant ones.    
-        TODO: add another condition: if the path contains a condition on prefix_length, check that the length of the prefix_trace is smaller
     '''
     logger.info("Extracting compliant paths for the given prefix trace.")
     compliant_paths = []
@@ -292,11 +299,21 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
         match = True
         
         # For each condition in the path
-        for feature_name, boolean_value in path[0]:
-            # If that feature was done in the prefix trace
-            if feature_name in prefix_trace:
+        for condition in path[0]:
+            # If we are considering prefix length
+            if len(condition) == 3:
+                _,op,threshold = condition
+                # Get the length of the prefix trace
+                print(prefix_trace)
+                prefix_length = prefix_trace['prefix_length']
+                if (op == '<=' and prefix_length > threshold or
+                   op == '>' and prefix_length <= threshold):
+                   match = False
+                   break
+            else:
+                feature_name, boolean_value = condition
                 # If the condition is not satisfied, mark the path as non-compliant and break
-                if prefix_trace[feature_name] != boolean_value:
+                if feature_name in prefix_trace and prefix_trace[feature_name] != boolean_value:
                     logger.debug(f"{feature_name}: {boolean_value} != {prefix_trace[feature_name]} (prefix) -> Discarded trace")
                     match = False
                     break
@@ -308,6 +325,31 @@ def get_compliant_paths(paths: list, prefix_trace: dict) -> list:
 
     logger.info(f"Found {len(compliant_paths)} compliant paths for the given prefix trace.")
     return compliant_paths
+
+def get_missing_conditions(best_compliant_path: list, prefix_trace: dict) -> list:
+    """
+        Given the best compliant path in the tree, and the current prefix,
+        returns the list of missing conditions to reach the positive outcome.
+        Parameters:
+            best_compliant_path (list): The best compliant path from the decision tree.
+            prefix_trace (dict): The current prefix trace as a dictionary.
+        Returns:
+            list: A list of tuples representing the missing conditions (feature_name, boolean_value).
+    """
+    recommendations = []
+    for condition in best_compliant_path:
+        feature_name = condition[0]
+        
+        # Ignore the prefix_length condition
+        if feature_name == 'prefix_length':
+            continue
+
+        path_boolean_value = condition[1]
+        # Check if the condition is missing in the prefix_trace
+        if feature_name not in prefix_trace or prefix_trace[feature_name] != path_boolean_value:
+            recommendations.append((feature_name, path_boolean_value))
+
+    return recommendations
 
 def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> dict:
     '''
@@ -331,27 +373,31 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
     # For every prefix_trace with False label
     for idx, row in prefix_set.iterrows():
         prefix_trace = row.to_dict()
+        logger.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
+        
+        # Keep only the true-valued activity
+        activity_features_key = frozenset({
+            k: v for k, v in row.items() 
+            if k not in ['trace_id', 'label', 'prefix_length'] and v == True
+        })
+        logger.debug(f"Prefix Trace Features: {activity_features_key}")
 
         # If the prefix trace was predicted as positive, we can add an empty recommendation
         if prefix_trace.get('predicted_label') == 'true':
-            true_prefix = frozenset({k: v for k, v in prefix_trace.items() if k != 'predicted_label' and k != 'trace_id' and v})
-            recommendation[true_prefix] = set()
+            recommendation[activity_features_key] = set()
             continue
-
-        logger.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
-        # Keep for each trace only the true-valued activity
-        prefix_trace_features = {
-            k: v for k, v in prefix_trace.items()
-            if k != 'predicted_label' and k != 'trace_id' and v != False
-        }
-        logger.debug(f"Prefix Trace Features: {prefix_trace_features}")
         
+        # Keep only the true-valued activity
+        current_prefix_conditions = {
+            k: v for k, v in row.items() 
+            if k not in ['trace_id', 'label'] and v == True or k == 'prefix_length'
+        }
         # Get the compliant paths for the current prefix_trace
-        compliant_paths = get_compliant_paths(paths, prefix_trace_features)
+        compliant_paths = get_compliant_paths(paths, current_prefix_conditions)
 
         # If no compliant path is found, set empty recommendation
         if not compliant_paths:
-            recommendation[prefix_trace.get('trace_id')] = set()
+            recommendation[activity_features_key] = set()
             continue
 
         # Pick the path with highest confidence, break ties by shortest length
@@ -361,14 +407,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         )
         logger.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
 
-        # Extract missing conditions
-        missing_conditions = {
-            (feat, val)
-            for (feat, val) in best_path
-            if feat not in prefix_trace_features
-        }
-
-        recommendation[frozenset(prefix_trace_features)] = missing_conditions
+        recommendation[activity_features_key] = get_missing_conditions(best_path, current_prefix_conditions)
 
     for k, v in recommendation.items():
         logger.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")

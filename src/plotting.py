@@ -178,6 +178,11 @@ def path_to_rule(path):
                 str: A human-readable rule in the form of a boolean expression.
     '''
     rule = []
-    for feature_name, boolean_value in path:
-        rule.append(f"{feature_name} == {boolean_value}")
+    for condition in path:
+        if len(condition) == 3:
+            feature_name, operator, threshold = condition
+            rule.append(f"{feature_name} {operator} {threshold}")
+        else:
+            feature_name, boolean_value = condition
+            rule.append(f"{feature_name} == {boolean_value}")
     return " AND ".join(rule)
