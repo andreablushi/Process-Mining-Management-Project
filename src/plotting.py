@@ -4,6 +4,7 @@ import sklearn.tree as tree
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
+from src.types import BooleanCondition, Path
 
 def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:bool=False, path:str="docs/media/decision_tree.png"):
     """
@@ -168,7 +169,7 @@ def print_recommendations_metrics(recommendations_metrics: dict):
     for metric, value in recommendations_metrics.items():
         print(f"{metric.capitalize()}: {value*100:.2f}%")
 
-def path_to_rule(path):
+def path_to_rule(path: Path):
     '''
         Convert a path from the decision tree to a human-readable rule.
         Each node condition (feature_name operator threshold) is combined using AND to form the rule.
@@ -177,12 +178,10 @@ def path_to_rule(path):
             Returns:
                 str: A human-readable rule in the form of a boolean expression.
     '''
-    rule = []
+    rule_parts = []
     for condition in path:
-        if len(condition) == 3:
-            feature_name, operator, threshold = condition
-            rule.append(f"{feature_name} {operator} {threshold}")
+        if isinstance(condition, BooleanCondition):
+            rule_parts.append(f"({condition.feature} == {condition.value})")
         else:
-            feature_name, boolean_value = condition
-            rule.append(f"{feature_name} == {boolean_value}")
-    return " AND ".join(rule)
+            rule_parts.append(f"({condition.feature} {condition.op} {condition.threshold})")
+    return " AND ".join(rule_parts)
