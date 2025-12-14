@@ -3,9 +3,14 @@ In this section, we present the evaluation results, for both $\textit{prefix\_le
 
 \subsection{Hyperparameters}
 Tables~\ref{tab:hyperparameters_5} and~\ref{tab:hyperparameters_10} show the optimized hyperparameters obtained through \textit{Hyperopt} for both prefix lengths. 
-Both configurations use entropy as the splitting criterion, which measures information gain and tends to create more balanced trees. 
-The max depth parameters prevent overfitting while allowing sufficient model complexity to capture the underlying patterns. 
-Note that the model uses only 3 max features, suggesting that at longer prefix lengths, individual activities become more discriminative for prediction.
+\\\\
+For $\textit{prefix\_length}=5$, the optimizer selects a shallow tree with a maximum depth of $3$ and a small number of features considered at each split.
+This choice limits overfitting in a setting where only partial information about the trace is available, while still allowing the model to exploit the most informative activities.
+The use of the entropy criterion leads to more balanced and interpretable decision paths.
+\\\\
+For $\textit{prefix\_length}=10$, the optimal configuration still constrains the maximum depth to $3$, confirming that deeper trees do not provide additional benefits even when more information is available.
+However, the number of maximum features increases, indicating that longer prefixes allow the model to effectively leverage a richer set of activities.
+In this case, the Gini criterion is selected, suggesting that it better captures class separation when more contextual information is present.
 
 \begin{table}[ht]
     \centering
@@ -16,8 +21,8 @@ Note that the model uses only 3 max features, suggesting that at longer prefix l
             \textbf{Hyperparameter} & \textbf{Value} \\
             \hline
             Criterion & Entropy \\
-            Max Depth & 4 \\
-            Max Features & 3 \\
+            Max Depth & 3 \\
+            Max Features & 2 \\
             \hline
         \end{tabular}
         \caption{Optimized hyperparameters for the decision tree classifier for $\textit{prefix\_length}=5$.}
@@ -30,8 +35,8 @@ Note that the model uses only 3 max features, suggesting that at longer prefix l
             \hline
             \textbf{Hyperparameter} & \textbf{Value} \\
             \hline
-            Criterion & Entropy \\
-            Max Depth & 4 \\
+            Criterion & Gini \\
+            Max Depth & 3 \\
             Max Features & 3 \\
             \hline
         \end{tabular}
@@ -44,8 +49,8 @@ Note that the model uses only 3 max features, suggesting that at longer prefix l
 \subsection{Decision Tree Structure}
 Figures~\ref{fig:decision_tree_5} and~\ref{fig:decision_tree_10} illustrate the structure of the trained decision trees.
 The color-coded leaf nodes (blue for positive outcomes, orange for negative outcomes) clearly show the distribution of predictions across different decision paths. 
-Both trees maintain interpretability despite their depth, as the controlled max depth parameters prevent excessive branching.
-The tree structures provide valuable insights into which activities and activity combinations are most discriminative for predicting case outcomes, making the model transparent.
+Both trees maintain interpretability thanks to their depth, as the controlled \textit{max\_depth} and \textit{max\_features} parameters prevent excessive branching.
+The tree structures provide valuable insights into which activities are most discriminative for predicting case outcomes, making the model transparent.
 
 \begin{figure}[H]
     \centering
@@ -64,12 +69,13 @@ The tree structures provide valuable insights into which activities and activity
 \subsubsection{Evaluation Metrics}
 
 The classification results in Tables~\ref{tab:evaluation_metrics_5} and~\ref{tab:evaluation_metrics_10} demonstrate the predictive performance of our decision tree models. 
-For $\textit{prefix\_length}=5$, the model achieves balanced results around the $65\%$ for all considered metrics. 
-This indicates reasonable performance given that the model has access to only the first 5 activities of each case.
-
-The performance improves significantly at $\textit{prefix\_length}=10$.
-This improvement suggests that longer prefixes provide substantially more discriminative information for predicting case outcomes. 
-
+\\\\
+For $\textit{prefix\_length}=5$, these results indicate a reasonably balanced performance when only a limited portion of each trace is available.
+In this setting, the model is already able to capture meaningful patterns, but the reduced amount of information limits its power.
+\\\\
+The performance further improves for $\textit{prefix\_length}=10$, where the results suggest that longer prefixes provide more informative context, enabling the model to make more confident positive predictions.
+Overall, the results confirm that increasing the \textit{prefix\_length} has a positive impact on outcome prediction, as more activities contribute to defining the case trajectory.
+\\\\
 The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:confusion_matrix_10} provide further insight into the distribution of predictions and misclassifications.
 
 \begin{figure}[H]
@@ -97,10 +103,10 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 67.44\% \\
-            Precision & 59.95\% \\
-            Recall & 67.44\% \\
-            F1-Score & 62.73\% \\
+            Accuracy & 69.77\% \\
+            Precision & 64.84\% \\
+            Recall & 69.77\% \\
+            F1-Score & 66.42\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=5$.}
@@ -113,10 +119,10 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 67.44\% \\
-            Precision & 69.37\% \\
-            Recall & 67.44\% \\
-            F1-Score & 68.27\% \\
+            Accuracy & 74.42\% \\
+            Precision & 83.97\% \\
+            Recall & 74.42\% \\
+            F1-Score & 76.04\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the decision tree classifier on the test set for $\textit{prefix\_length}=10$.}
@@ -127,7 +133,7 @@ The confusion matrices in Figures~\ref{fig:confusion_matrix_5} and~\ref{fig:conf
 \subsection{Recommendation Analysis}
 
 \paragraph{Recommendation Generation}
-For the sake of simplicity in explaining the recommendation extraction process, we chose to consider the tree in Figure~\ref{fig:decision_tree_recommendation} that, while not optimal, has a smaller depth.
+For the sake of simplicity in explaining the recommendation extraction process, we chose to consider the tree in Figure~\ref{fig:decision_tree_recommendation}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.8\textwidth]{../media/decision_tree_small.png}
@@ -163,12 +169,14 @@ This is illustrated in Figure~\ref{fig:recommendation_tree}, with the green dott
 \paragraph{Recommendations Quality}
 Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_10} present the evaluation of our recommendation system.
 This values have to be considered as an approximation, since the ground truth is based on actual traces rather than hypothetical scenarios where recommendations were followed.
-At $\textit{prefix\_length}=5$, the recommendation system achieves a balanced accuracy better than the classifier, with all metrics around $80\%$. 
-This indicates that even with limited information from shorter prefixes, the system can provide reasonably accurate recommendations.
-
-The recommendation system shows marked improvement at $\textit{prefix\_length}=10$.
-This strong performance, suggests that the recommendation system can be reliably deployed to guide ongoing cases toward positive outcomes. 
-
+\\\\
+For $\textit{prefix\_length}=5$, the recommendation system achieves a very high accuracy, coupled with a good recall.
+This indicates that, even with limited information, the system is often able to identify recommendations that align with positive outcomes.
+The lower precision reflects the fact that some recommended actions may not always be necessary, but overall the system demonstrates strong reliability in this setting.
+\\\\
+At $\textit{prefix\_length}=10$, the accuracy decreases, while precision remains high.
+This behavior suggests a more conservative recommendation strategy: the system proposes fewer but more targeted actions, which increases precision at the expense of overall accuracy.
+Despite this trade-off, the results confirm that the recommendation system remains effective and meaningful when more contextual information is available, supporting its usage.
 \begin{table}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -177,10 +185,10 @@ This strong performance, suggests that the recommendation system can be reliably
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 77.14\% \\
-            Precision & 84.38\% \\
-            Recall & 80.60\% \\
-            F1-Score & 69.77\% \\
+            Accuracy & 93.75\% \\
+            Precision & 75.00\% \\
+            Recall & 83.33\% \\
+            F1-Score & 72.09\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=5$.}
@@ -193,10 +201,10 @@ This strong performance, suggests that the recommendation system can be reliably
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 81.82\% \\
-            Precision & 84.38\% \\
-            Recall & 83.08\% \\
-            F1-Score & 74.42\% \\
+            Accuracy & 68.75\% \\
+            Precision & 81.48\% \\\
+            Recall & 74.58\% \\
+            F1-Score & 65.12\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=10$.}
