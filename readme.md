@@ -1,11 +1,10 @@
-# Process Mining and Management Project
+# Recommendation System for Process Monitoring
 
 Implementation of **predictive process monitoring** and **prescriptive recommendations** using DecisionTrees with boolean encoding.
 
 The project was developed as part of the course "Process Mining and Management", held by Prof. Chiara Di Francescomarino at the University of Trento, Master's Degree in Computer Science
 
 [View Full Report (PDF)](docs/report.pdf)
-
 
 ## Table of Contents
 
@@ -31,8 +30,8 @@ To install and set up the project, follow these steps:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/andreablushi/Process-Mining-Management-Project
-   cd Process-Mining-Management-Project
+   git clone https://github.com/andreablushi/Recommendation-System
+   cd Recommendation-System
    ```
 
 2. Create a virtual environment (recommended):
