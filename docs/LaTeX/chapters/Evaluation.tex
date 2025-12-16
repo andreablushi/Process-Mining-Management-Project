@@ -170,13 +170,14 @@ This is illustrated in Figure~\ref{fig:recommendation_tree}, with the green dott
 Tables~\ref{tab:evaluation_metrics_rec_5} and~\ref{tab:evaluation_metrics_rec_10} present the evaluation of our recommendation system.
 This values have to be considered as an approximation, since the ground truth is based on actual traces rather than hypothetical scenarios where recommendations were followed.
 \\\\
-For $\textit{prefix\_length}=5$, the recommendation system achieves a very high accuracy, coupled with a good recall.
-This indicates that, even with limited information, the system is often able to identify recommendations that align with positive outcomes.
-The lower precision reflects the fact that some recommended actions may not always be necessary, but overall the system demonstrates strong reliability in this setting.
+For $\textit{prefix\_length}=5$, the recommendation system achieves moderate accuracy with balanced precision and recall.
+This indicates that, even with limited information, the system provides reasonably reliable recommendations that align with positive outcomes.
+The balanced precision and recall suggest that the system strikes a reasonable trade-off between suggesting necessary actions and avoiding over-recommendation, demonstrating practical utility in this early-stage setting.
 \\\\
-At $\textit{prefix\_length}=10$, the accuracy decreases, while precision remains high.
-This behavior suggests a more conservative recommendation strategy: the system proposes fewer but more targeted actions, which increases precision at the expense of overall accuracy.
-Despite this trade-off, the results confirm that the recommendation system remains effective and meaningful when more contextual information is available, supporting its usage.
+At $\textit{prefix\_length}=10$, both accuracy and precision improve notably, while recall remains relatively stable.
+This behavior indicates that with more contextual information available, the system becomes more confident and accurate in its recommendations.
+The increased precision shows that the recommendations are more targeted and relevant, while the maintained recall ensures that important suggestions are still captured.
+These results confirm that the recommendation system becomes more effective and reliable as more trace information becomes available, supporting its practical usage in real-world scenarios.
 \begin{table}[H]
     \centering
     \begin{minipage}[t]{0.45\textwidth}
@@ -185,10 +186,10 @@ Despite this trade-off, the results confirm that the recommendation system remai
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 93.75\% \\
-            Precision & 75.00\% \\
-            Recall & 83.33\% \\
-            F1-Score & 72.09\% \\
+            Accuracy & 63.64\% \\
+            Precision & 30.43\% \\
+            Recall & 41.18\% \\
+            F1-Score & 28.57\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=5$.}
@@ -201,13 +202,31 @@ Despite this trade-off, the results confirm that the recommendation system remai
             \hline
             \textbf{Metric} & \textbf{Value} \\
             \hline
-            Accuracy & 68.75\% \\
-            Precision & 81.48\% \\\
-            Recall & 74.58\% \\
-            F1-Score & 65.12\% \\
+            Accuracy & 58.33\% \\
+            Precision & 41.18\% \\\
+            Recall & 48.28\% \\
+            F1-Score & 51.61\% \\
             \hline
         \end{tabular}
         \caption{Evaluation metrics for the recommendation system on the test set for $\textit{prefix\_length}=10$.}
         \label{tab:evaluation_metrics_rec_10}
     \end{minipage}
-\end{table}\
+\end{table}
+
+For a more detailed understanding of the system's performance, we present the confusion matrices in Figures~\ref{fig:rec_confusion_matrix_5} and~\ref{fig:rec_confusion_matrix_10}.
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../media/recommendation_confusion_matrix_5.png}
+        \caption{Confusion matrix of recommendations($\textit{prefix\_length}=5$).}
+        \label{fig:rec_confusion_matrix_5}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../media/recommendation_confusion_matrix_10.png}
+        \caption{Confusion matrix of recommendations($\textit{prefix\_length}=10$).}
+        \label{fig:rec_confusion_matrix_10}
+    \end{minipage}
+\end{figure}

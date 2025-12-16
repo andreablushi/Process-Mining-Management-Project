@@ -440,30 +440,30 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
     
-    # Process each trace in the test set
-    for _, row in test_set.iterrows():
-        trace_id = row['trace_id']
-        ground_truth = row['label']
-
-        # Extract the features of the full trace (activities that occurred (True))
-        full_trace_features = {
-            k for k, v in row.items() 
-            if k not in ['trace_id', 'label', 'prefix_length'] and v == True
-        }
-        
-        # Find matching recommendation for this prefix trace
-        recommendation = None
-        for prefix_features, rec in recommendations.items():
+    # Process each recommendation (prefix trace)
+    for prefix_features, recommendation in recommendations.items():
+        # Find the matching full trace in the test set
+        for _, row in test_set.iterrows():
+            # Extract the features of the full trace (activities that occurred (True))
+            full_trace_features = {
+                k for k, v in row.items() 
+                if k not in ['trace_id', 'label', 'prefix_length'] and v == True
+            }
+            
             # Check if this prefix is a subset of the full trace features
             # A prefix 'P' matches if all activities in 'P' are also in the 'full_trace_features'.
             if set(prefix_features).issubset(full_trace_features):
-                recommendation = rec
+                matching_trace = row
                 break
         
-        if recommendation is None:
-            # If no recommendation was made for this trace, skip it in evaluation
-            logger.debug(f"Trace ID: {trace_id} has no recommendation. Skipping.")
-            continue
+        trace_id = matching_trace['trace_id']
+        ground_truth = matching_trace['label']
+        
+        # Extract the features of the matching full trace
+        full_trace_features = {
+            k for k, v in matching_trace.items() 
+            if k not in ['trace_id', 'label', 'prefix_length'] and v == True
+        }
         
         """
         Check if the recommendation was followed. 
