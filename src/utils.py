@@ -437,25 +437,33 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     """
     logger.info("Evaluating recommendations")
     
+    # Pre-compute feature sets for all traces in the test set
+    test_traces = []
+    for _, row in test_set.iterrows():
+        full_trace_features = frozenset(
+            k for k, v in row.items()
+            if k not in ['trace_id', 'label', 'prefix_length'] and v is True
+        )
+        test_traces.append((full_trace_features, row))
     # Initialize counters
     t_p = t_n = f_p = f_n = 0
     
     # Process each recommendation (prefix trace)
     for prefix_features, recommendation in recommendations.items():
+        matching_trace = None
         # Find the matching full trace in the test set
-        for _, row in test_set.iterrows():
-            # Extract the features of the full trace (activities that occurred (True))
-            full_trace_features = {
-                k for k, v in row.items() 
-                if k not in ['trace_id', 'label', 'prefix_length'] and v == True
-            }
-            
+        for full_trace_features, row in test_traces:
             # Check if this prefix is a subset of the full trace features
             # A prefix 'P' matches if all activities in 'P' are also in the 'full_trace_features'.
             if set(prefix_features).issubset(full_trace_features):
                 matching_trace = row
+                # We found the matching full trace, exit the inner loop
                 break
         
+        if matching_trace is None:
+            logger.debug(f"No matching full trace found for prefix features: {set(prefix_features)}. Skipping.")
+            continue
+
         trace_id = matching_trace['trace_id']
         ground_truth = matching_trace['label']
         
