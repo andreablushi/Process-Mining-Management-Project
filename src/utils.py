@@ -21,7 +21,7 @@ logging.basicConfig(
 
 # Create and configure your application's logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Set your module's logger to INFO
+logger.setLevel(logging.INFO)  # Set your module's logger to INFO
 
 def import_log(file_path: str) -> EventLog:
     """
@@ -509,8 +509,10 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
     total_predictions = t_p + t_n + f_p + f_n
     
     if total_predictions == 0:
-         return {
-            'precision': 0.0, 'recall': 0.0, 'f1_score': 0.0, 'accuracy': 0.0,
+        return {
+            'tp': 0, 'tn': 0, 'fp': 0, 'fn': 0,
+            'precision': 0.0, 'recall': 0.0,
+            'f1_score': 0.0, 'accuracy': 0.0,
         }
 
     precision = t_p / (t_p + f_p) if (t_p + f_p) > 0 else 0
@@ -520,6 +522,10 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
 
     # Return comprehensive results
     return {
+        'tp': t_p,
+        'tn': t_n,
+        'fp': f_p,
+        'fn': f_n,
         'precision': round(precision, 4),
         'recall': round(recall, 4),
         'f1_score': round(f1_score_value, 4),

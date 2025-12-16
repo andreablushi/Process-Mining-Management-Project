@@ -1,4 +1,5 @@
-from matplotlib import pyplot as plot
+from matplotlib import pyplot as plt
+import numpy as np
 import matplotlib.patches as mpatches
 import sklearn.tree as tree
 from sklearn.tree import DecisionTreeClassifier
@@ -16,7 +17,7 @@ def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:b
         save: Whether to save the plot as PNG
     """
     # Use plot_tree with proportion=True to show probabilities, and custom labels
-    plot.figure(figsize=(30, 20))
+    plt.figure(figsize=(30, 20))
     tree.plot_tree(
         clf,
         feature_names=activity_names,
@@ -28,8 +29,8 @@ def plot_decision_tree(clf : DecisionTreeClassifier, activity_names:list, save:b
 
     # Optionally save the figure
     if save:
-        plot.savefig(path, bbox_inches='tight')
-    plot.show()
+        plt.savefig(path, bbox_inches='tight')
+    plt.show()
 
 def plot_recommendation_on_tree(clf: DecisionTreeClassifier, 
                                 activity_names: list, 
@@ -49,8 +50,8 @@ def plot_recommendation_on_tree(clf: DecisionTreeClassifier,
         path: Path to save the plot
     """
     # Create figure
-    fig = plot.figure(figsize=(30, 20))
-    ax = plot.gca()
+    fig = plt.figure(figsize=(30, 20))
+    ax = plt.gca()
 
     # Plot the basic decision tree
     tree_plot = tree.plot_tree(
@@ -129,16 +130,16 @@ def plot_recommendation_on_tree(clf: DecisionTreeClassifier,
     if prefix_trace_features or recommended_conditions:
         title += f'\n[Prefix: {len(prefix_trace_features)} features | '
         title += f'Recommendations: {len(recommended_conditions)} conditions]'
-    plot.title(title, fontsize=24, pad=20, fontweight='bold')
+    plt.title(title, fontsize=24, pad=20, fontweight='bold')
     
-    plot.tight_layout()
+    plt.tight_layout()
     
     # Save if requested
     if save:
-        plot.savefig(path, bbox_inches='tight', dpi=150)
+        plt.savefig(path, bbox_inches='tight', dpi=150)
         print(f"Tree visualization saved to: {path}")
     
-    plot.show()
+    plt.show()
 
 def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=False, path:str="docs/media/confusion_matrix.png"): 
     '''
@@ -147,7 +148,7 @@ def plot_confusion_matrix(true_labels: list, predicted_labels: list, save: bool=
             true_labels: The true labels of the test set.
             predicted_labels: The predicted labels from the model.
     '''
-    cm_display = ConfusionMatrixDisplay.from_predictions(true_labels, predicted_labels, cmap=plot.cm.Blues)
+    cm_display = ConfusionMatrixDisplay.from_predictions(true_labels, predicted_labels, cmap=plt.cm.Blues)
     if save:
         cm_display.figure_.savefig(path)
 
@@ -183,7 +184,59 @@ def print_recommendations_metrics(recommendations_metrics: dict):
     '''
     print("Recommendations Evaluation Metrics:")
     for metric, value in recommendations_metrics.items():
-        print(f"{metric.capitalize()}: {value*100:.2f}%")
+        if metric not in ['tp', 'tn', 'fp', 'fn']:
+            print(f"{metric.capitalize()}: {value*100:.2f}%")
+
+def plot_recommendation_confusion_matrix(recommendations_metrics: dict, save: bool=False, path:str="docs/media/recommendation_confusion_matrix.png"):
+    '''
+        Plot the confusion matrix for recommendations using matplotlib to match the provided image.
+    '''
+    t_p = recommendations_metrics.get('tp', 0)
+    t_n = recommendations_metrics.get('tn', 0)
+    f_p = recommendations_metrics.get('fp', 0)
+    f_n = recommendations_metrics.get('fn', 0)
+    
+    # 1. Correct Matrix Construction: [[TN, FP], [FN, TP]]
+    # This aligns rows to Actual labels and columns to Predicted labels
+    cm = np.array([
+        [t_n, f_p],
+        [f_n, t_p]
+    ])
+
+    fig, ax = plt.subplots()
+    
+    # 2. Use the 'Blues' colormap to match the image
+    im = ax.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+
+    # 3. Add the colorbar on the right
+    ax.figure.colorbar(im, ax=ax)
+
+    # 4. Set specific lowercase labels as seen in the image
+    classes = ['false', 'true']
+    ax.set(xticks=np.arange(cm.shape[1]),
+           yticks=np.arange(cm.shape[0]),
+           # ... and label them with the correct class names
+           xticklabels=classes, 
+           yticklabels=classes,
+           ylabel='True label',
+           xlabel='Predicted label')
+
+    # 5. Annotate cells with dynamic text color 
+    # (White text on dark background, Dark text on light background)
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax.text(j, i, format(cm[i, j], 'd'),
+                    ha="center", va="center",
+                    # Use white if background is dark, otherwise dark blue
+                    color="white" if cm[i, j] > thresh else "#204a87")
+
+    fig.tight_layout()
+
+    if save:
+        plt.savefig(path, dpi=300)
+
+    plt.show()
 
 def path_to_rule(path: Path):
     '''
