@@ -1,64 +1,62 @@
 \section{Implementation}
-We implemented a recommendation system using a decision tree classifier to analyze production event logs.
-The implementation was achieved using Python, leveraging libraries such as \textit{PM4Py} for process mining tasks and \textit{scikit-learn} for machine learning functionalities.
+A recommendation system was implemented using a decision tree classifier to analyze production event logs.
+The implementation was achieved in Python, leveraging libraries such as \textit{PM4Py} for process mining tasks and \textit{scikit-learn} for machine learning functionalities.
 The execution flow of our implementation resides within the \textit{notebook.ipynb} file, which calls all the designed utility functions.
 
 \subsection{Encoding the Event Log}
 We began by importing the event log file, which is in \textit{XES} format, using the \textit{PM4Py} library. 
 We then converted this file into a \textit{PM4Py} event log object suitable for subsequent process mining tasks.
 \\\\
-A pruned copy of the event log was created in order to take into consideration only the prefixes of each trace.
-To do this, each trace in the log was truncated to \textit{prefix\_length} events.
-Since in a real-world scenario the partial ongoing trace is incomplete, we need to train the classifier 
-only on the prefixes of the traces.
+A pruned copy of the event log was created to consider only the prefixes of each trace.
+To achieve this, each trace in the log was truncated to \textit{prefix\_length} events.
+Since the partial ongoing trace in a real-world scenario is incomplete, we trained the classifier 
+exclusively on the prefixes of the traces.
 \\\\
-Next, from the complete event log, we extracted the unique activity names to serve as columns (features) for the encoding step.
-To these columns, we also added the trace identifier, the prefix length and the ground truth label that indicates whether the trace outcome was positive or negative.
+Next, we extracted the unique activity names from the complete event log to serve as columns (features) for the encoding step.
+In addition to these, we included the trace identifier, the prefix length, and the ground truth label, 
+which indicates whether the trace outcome was positive or negative.
 \\\\
-To use this data for training a decision tree classifier, we encoded the pruned event using a \textit{Boolean encoding} scheme.
+To prepare this data for training a decision tree classifier, the pruned events were encoded using a \textit{Boolean encoding} scheme.
 This encoding involved creating binary features for each unique activity name. 
-For each trace in the event log, if an activity was present within the trace, the corresponding feature in that row was set to true (1); otherwise, it was set to false (0).
-This approach allows to build a feature set with a fixed number of columns, regardless of the varying lengths of the traces. This implies that we don't need to worry about padding the traces to a uniform length.
+For each trace, if an activity was present within the trace, the corresponding feature in that row was set to true (1); otherwise, it was set to false (0).
+This approach allows for the creation of a feature set with a fixed number of columns, eliminating the need to pad traces to a uniform length.
 Upon completion, we obtained a \textit{DataFrame} in which each row represented a trace, while the feature columns indicated the presence or absence of specific activities within that trace.
 
 \subsection{Training the Decision Tree Classifier}
-After encoding the pruned event log, a decision tree classifier was trained using the \textit{scikit-learn} library.  
-We split the encoded log into features (by removing the trace identifier and label columns from the original encoding) and labels, which were the ground truth extracted directly from the log.  
-The \textit{XES} file was already partitioned into separate training and testing sets; we used these to train and evaluate the classifier, respectively.
+Following the encoding of the pruned event log, a decision tree classifier was trained using the \textit{scikit-learn} library.  
+We separated the encoded log into features $(\boldsymbol{X})$, which were derived by removing the trace identifier and label columns, and labels $(\boldsymbol{y})$, which represented the ground truth extracted directly from the log.  
+The dataset had been pre-partitioned in the original \textit{XES} file into distinct training and testing sets; these partitions were used to train and evaluate the classifier, respectively.
 \\\\
 After training the classifier, it was possible to visualize the learned decision rules by plotting the decision tree using built-in \textit{scikit-learn} functionality.  
 
 \subsection{Optimizing the Classifier Hyperparameters}
 To enhance the performance of our decision tree classifier, we employed the \textit{Hyperopt} library to perform hyperparameter optimization.
-This tool systematically iterates through various combinations of hyperparameters, such as maximum tree depth, maximum features, and criterion (e.g., Gini or entropy), to identify the configuration that yields the optimal performance.
+This tool systematically explores a defined search space, iteratively testing combinations of critical hyperparameters—such as \textit{max\_depth}, \textit{max\_features}, and the split criterion (e.g., \textit{Gini} or \textit{entropy})—to identify the optimal configuration.
 At every iteration, the model was trained and evaluated using the $F_1$-score as the primary performance metric. 
 Only the configuration that resulted in the highest $F_1$-score was retained for the final model.
 The \textit{Hyperopt} library also allowed us to define a search space and to specify the maximum number of iterations to perform.
 
 \subsection{Generating Predictions}
-After training the classifier, we used it to generate predictions on the test set. 
-The predicted labels were obtained by applying the trained model to the feature set derived from the encoded test log.
-Those feature were cleaned by removing the trace identifier and ground truth label columns, similar to the training phase.
-Then we evaluated the classifier's performance using standard metrics such as accuracy, precision, recall, and F1-score, provided by the \textit{scikit-learn} library.
+After training, the optimized classifier was used to generate predictions on the test set. 
+The predicted labels were obtained by applying the trained model to the feature set derived from the encoded test log. 
+Similar to the training phase, the features $(\boldsymbol{X}_{test})$ were prepared by removing the trace identifier and ground truth label columns. 
+The classifier's performance was subsequently evaluated using standard scikit-learn metrics, including \textit{Accuracy}, \textit{Precision}, \textit{Recall}, and the \textit{F1-score}.
 
 \subsection{Extracting Recommendations}
-Given the predictions obtained from the decision tree classifier, using the transparent structure of the tree, 
-we can provide recommendations for traces predicted to have a negative outcome.
-To achieve this, we needed to:
+Given the interpretability inherent in the decision tree structure, the model can provide proactive recommendations specifically for traces predicted to result in a negative outcome.
+The process for generating these recommendations involved three main steps:
 \begin{enumerate}
-    \item Extract the positive paths from the decision tree, which are the paths leading to leaf nodes with a positive outcome.
-    \item For each prefix trace predicted as negative:
-    \begin{itemize}
-        \item Filter the positive paths to find the ones that are compliant with the current trace;
-        \item From the compliant paths, take the one with the highest confidence score;
-        \item The recommended activities are the ones that need to be added to the current trace to follow the selected positive path.
-    \end{itemize}
+    \item \textbf{Extracting Positive Paths}: identify all distinct paths in the decision tree that lead to a leaf node associated with a positive outcome.
+    \item \textbf{Filtering Compliant Paths}: for a given negatively-predicted trace prefix, filter the positive paths to find those that are compliant 
+    (i.e., whose conditions are not violated by the activities already present in the trace).
+    \item \textbf{Generating Recommendations}: from the compliant positive paths, select the one with the highest confidence score. Determine the set of 
+    activities required to complete that path.
 \end{enumerate}
 
 \paragraph{Extracting Positive Paths from the Decision Tree:}
-To extract the positive paths from the decision tree, we traversed the tree structure starting from the root node in a \textit{depth-first} manner.
-At each node in the path, we recorded the feature and the boolean condition (true or false) that leads to the next node.
-When we reached a leaf node, we checked if it corresponded to a positive outcome. If it did, we stored the entire path taken to reach that leaf, with the associated confidence score, as a positive path.
+To extract all positive paths from the decision tree, we traversed the tree structure starting from the root node using a \textit{Depth-first search} (DFS) approach.
+At each decision node in the path, we recorded the feature, the operator (e.g., $\le$, $>$), and the threshold that leads to the next node.
+\\Upon reaching a leaf node, if the node's label corresponded to a positive outcome, the entire path, along with its associated confidence score, was stored as a positive path.
 \begin{algorithm}[H]
     \label{alg:get_positive_paths}
     \caption{Get Positive Paths}
@@ -69,11 +67,11 @@ When we reached a leaf node, we checked if it corresponded to a positive outcome
                 \State Add (current\_path, node.confidence) to positive\_paths
             \EndIf
         \Else
-            \State Append (node.feature, False) to current\_path
+            \State Append (node.feature, $\le$, node.value) to current\_path
             \State Call \textbf{GetPositivePaths}(node.left, current\_path, positive\_paths)
-            
             \State Remove last element from current\_path
-            \State Append (node.feature, True) to current\_path
+            \\
+            \State Append (node.feature, $>$, node.value) to current\_path
             \State Call \textbf{GetPositivePaths}(node.right, current\_path, positive\_paths)
             
             \State Remove last element from current\_path
@@ -82,14 +80,14 @@ When we reached a leaf node, we checked if it corresponded to a positive outcome
     \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Filter compliant paths:}
-After extracting all positive paths from the decision tree, for each prefix trace predicted as negative, we filtered only the \textit{compliant} paths.
-A path is considered \textit{compliant} with a trace if none of the conditions along the path are violated by the current prefix trace.
-Among all the compliant paths, we selected the one with the highest confidence score. If two or more paths had the same confidence score, we selected the shortest one.
+\paragraph{Filtering compliant paths:}
+After all positive paths were extracted, for each prefix trace predicted as negative, we filtered the set to retain only the \textit{compliant} paths. 
+A path is defined as compliant if and only if none of the feature conditions along the path are violated by the set of activities currently present in the prefix trace. 
+Among all compliant paths, the one with the highest confidence score was selected. In case of a tie in confidence, the path with the shortest length was chosen as the tie-breaker.
 
 \paragraph{Generate Recommendations:}
-Once we identified the most suitable positive compliant path, we generated recommendations by determining the activities that needed to be added to the current trace to follow the selected path.
-For each prefix seen in the test set, its recommendation is defined as follows:
+Once the most suitable positive compliant path was identified, recommendations were generated by determining the activities that needed to be added to the current trace to follow the selected path.
+For each test set prefix, the recommendation set is defined as:
 \begin{itemize}
     \item The empty set if the prefix was predicted as positive or if no compliant positive path was found;
     \item The set of activities corresponding to the conditions in the selected positive path that were not satisfied by the current prefix trace otherwise.
@@ -105,9 +103,9 @@ Note that if a matched prefix had an empty recommendation, it was interpreted as
 \\\\
 With those checks we can create an approximated confusion matrix, where:
 \begin{itemize}
-    \item True Positives: The recommended activity was followed in the actual trace, and the ground truth outcome is positive.
-    \item False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive.
-    \item True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative.
-    \item False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative.
+    \item \textbf{True Positives}: The recommended activity was followed in the actual trace, and the ground truth outcome is positive.
+    \item \textbf{False Positives}: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive.
+    \item \textbf{True Negatives}: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative.
+    \item \textbf{False Negatives}: The recommended activity was followed in the actual trace, but the ground truth outcome is negative.
 \end{itemize}
 Starting from this confusion matrix, we computed standard evaluation metrics such as accuracy, precision, recall, and F1-score to assess the effectiveness of the recommendations provided by our system.
