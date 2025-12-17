@@ -52,6 +52,10 @@ def create_prefixes_log(log: EventLog, prefix_length: int) -> EventLog:
         Returns:
             EventLog: The new event log object with prefixes.
     """
+    if prefix_length < 1:
+        logger.error("Prefix length must be at least 1.")
+        raise ValueError("Prefix length must be at least 1.")
+    
     logger.info(f"Creating prefixes log with prefix length: {prefix_length}")
     prefixes_log = EventLog()
     
@@ -371,43 +375,46 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
                 if the prefix is already positive, the recommendation is an empty set.
                 Otherwise, where possible, it contains the missing activities to reach a positive outcome.
     '''
+    # Define the key to exclude for activity features only
+    ACTIVITY_EXCLUDED_KEYS = {"trace_id", "label", "prefix_length"}
+
     logger.info("Extracting recommendations for the given prefix set.")
     recommendation = {}
-
+    
     # Extract the positive paths from the decision tree
     paths = get_positive_paths(tree, feature_names)
         
-    # For every prefix_trace with False label
-    for idx, row in prefix_set.iterrows():
+    # For every prefix_trace
+    for _, row in prefix_set.iterrows():
         prefix_trace = row.to_dict()
         logger.debug(f"Processing trace: {prefix_trace.get('trace_id')}; Full Trace: {prefix_trace}")
-        
-        # Keep only the true-valued activity
-        activity_features_key = frozenset({
-            k: v for k, v in row.items() 
-            if k not in ['trace_id', 'label', 'prefix_length'] and v == True
-        })
-        logger.debug(f"Prefix Trace Features: {activity_features_key}")
 
-        # If the prefix trace was predicted as positive, we can add an empty recommendation
-        if prefix_trace.get('predicted_label') == 'true':
-            logger.debug(f"Trace {prefix_trace.get('trace_id')} already positive; no recommendation needed.")
-            recommendation[activity_features_key] = set()
+        # Skip already positive traces
+        if prefix_trace['predicted_label'] == 'true':
+            logger.debug(f"Trace {prefix_trace.get('trace_id')} is already positive; no recommendation needed.")
             continue
         
-        # Keep only the true-valued activity
-        current_prefix_conditions = {
+        # Extract true valued activity features
+        true_features = {
             k: v for k, v in row.items() 
-            if (k not in ['trace_id', 'label'] and v == True)
-               or k == 'prefix_length'
+            if k not in ACTIVITY_EXCLUDED_KEYS and v == True
         }
+        prefix_trace_key = frozenset(true_features.keys())
+        logger.debug(f"Prefix Trace Features: {set(prefix_trace_key)}")
+        
+        # Current prefix conditions (true features + prefix_length)
+        current_prefix_conditions = {
+            **true_features,
+            "prefix_length": row["prefix_length"]
+        }
+
         # Get the compliant paths for the current prefix_trace
         compliant_paths = get_compliant_paths(paths, current_prefix_conditions)
 
         # If no compliant path is found, set empty recommendation
         if not compliant_paths:
             logger.debug(f"No compliant paths found for trace {prefix_trace.get('trace_id')}; no recommendation possible.")
-            recommendation[activity_features_key] = set()
+            recommendation[prefix_trace_key] = set()
             continue
 
         # Pick the path with highest confidence, break ties by shortest length
@@ -417,7 +424,7 @@ def extract_recommendations(tree, feature_names, prefix_set: pd.DataFrame) -> di
         )
         logger.info(f"Best Compliant Path: {path_to_rule(best_path)} with confidence {confidence}")
 
-        recommendation[activity_features_key] = get_missing_conditions(best_path, current_prefix_conditions)
+        recommendation[prefix_trace_key] = get_missing_conditions(best_path, current_prefix_conditions)
 
     for k, v in recommendation.items():
         logger.debug(f"Prefix Trace: {set(k)} -> Recommended Activities: {v}")
