@@ -480,13 +480,13 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
             logger.debug(f"Trace {trace_id} was already positive; skipping recommendation evaluation.")
             continue
         
-        # If no recommendation was possible, skip the trace
+        recommendation_followed = True
+        # If no recommendation was possible, count as not followed, the next loop will be skipped implicitly since it's empty
         if recommendation == set():
             logger.debug(f"Trace {trace_id} has negative outcome, but no recommendation was possible.")
-            continue
+            recommendation_followed = False
             
         # Check if the recommendation was followed in the full trace
-        recommendation_followed = True
         for boolean_condition in recommendation:
             activity = boolean_condition.feature
 
@@ -513,11 +513,11 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
             # True Negatives: The recommended activity was not followed in the actual trace, and the ground truth outcome is negative. 
             t_n += 1
         elif not recommendation_followed and ground_truth == 'true':
-            # False Positives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
-            f_p += 1
-        elif recommendation_followed and ground_truth == 'false':
-            # False Negatives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
+            # False Negatives: The recommended activity was not followed in the actual trace, but the ground truth outcome is positive. 
             f_n += 1
+        elif recommendation_followed and ground_truth == 'false':
+            # False Positives: The recommended activity was followed in the actual trace, but the ground truth outcome is negative. 
+            f_p += 1
 
     # Calculate metrics
     total_predictions = t_p + t_n + f_p + f_n
