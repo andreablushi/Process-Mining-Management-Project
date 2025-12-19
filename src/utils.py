@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from sklearn.tree import DecisionTreeClassifier, _tree
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, accuracy_score
 from src.plotting import path_to_rule
 from src.types import BooleanCondition, ThresholdCondition, Condition, Path
 
@@ -135,9 +135,7 @@ def boolean_encode(log: EventLog, activity_names:list):
     for trace in log:
         # Initialize the encoded row with trace_id and prefix length
         encoded_row = [trace.attributes["concept:name"]]
-        encoded_row.append(len(trace))
-        logger.debug(f"Encoding trace ID: {trace.attributes['concept:name']} with prefix length: {len(trace)}")
-       
+        encoded_row.append(len(trace))       
         # Initialize boolean indicators for each activity as False
         bool_events = [False] * len(activity_names)
         for event in trace:
@@ -555,3 +553,59 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
         'f1_score': round(f1_score_value, 4),
         'accuracy': round(accuracy, 4),
     }
+
+def compute_prefix_length_statistics(training_log: EventLog, test_log: EventLog, prefix_length: int, activity_names: list, hyperparameter_space: dict, max_evals: int=300) -> dict:
+    '''
+            Parameters:
+                - training_log (EventLog): The training event log object.
+                - test_log (EventLog): The test event log object.
+                - prefix_length (int): The prefix length to compute statistics for.
+                - activity_names (list): List of activity names.
+                - hyperparameter_space (dict): The hyperparameter search space for optimization.
+                - max_evals (int): The maximum number of evaluations for hyperparameter optimization.
+            Returns:
+                dict: A dictionary containing statistics about the given prefix length. It is 
+                composed by:
+                    - 'tree_accuracy': Accuracy of the Decision Tree Classifier.
+                    - 'tree_f1': F1-score of the Decision Tree Classifier.
+    '''
+    logger.info(f"Computing statistics for prefix length {prefix_length}.")
+    result = {}
+    # Prepare training data
+    pruned_log = create_prefixes_log(training_log, prefix_length=prefix_length)
+    encoded_log = boolean_encode(pruned_log, activity_names)
+    features = ['prefix_length'] + activity_names
+
+    # Hyperparameter optimization
+    params = hyperparameter_optimization(encoded_log, max_evals=max_evals, space=hyperparameter_space)
+    clf = DecisionTreeClassifier(
+        max_depth=params['max_depth'], 
+        max_features=params['max_features'], 
+        criterion=params['criterion'], 
+        random_state=params['random_state']
+    )
+    clf.fit(encoded_log.drop(['trace_id', 'label'], axis=1), encoded_log['label'])
+
+    # Prepare test data
+    test_log_prefix = create_prefixes_log(test_log, prefix_length=prefix_length)
+    test_encoded_log = boolean_encode(test_log_prefix, activity_names)
+    predictions = clf.predict(test_encoded_log.drop(['trace_id', 'label'], axis=1))
+    
+    # Compute evaluation metrics
+    true_labels = test_encoded_log['label'].values
+    pred_accuracy = accuracy_score(true_labels, predictions)
+    pred_f1 = f1_score(true_labels, predictions, pos_label='true')
+    # Store results
+    result['tree_accuracy'] = pred_accuracy
+    result['tree_f1'] = pred_f1
+    
+    # Compute the recommendation evaluation metrics
+    test_encoded_log_with_predictions = test_encoded_log.copy().drop('label', axis=1)
+    test_encoded_log_with_predictions['predicted_label'] = predictions
+    full_trace_test_encoded_log = boolean_encode(test_log, activity_names)
+    recommendations = extract_recommendations(clf, features, test_encoded_log_with_predictions)
+    evaluation_metrics = evaluate_recommendations(full_trace_test_encoded_log, recommendations)
+    result['recommendation_accuracy'] = evaluation_metrics['accuracy']
+    result['recommendation_f1'] = evaluation_metrics['f1_score']
+    logger.info(f"Statistics for prefix length {prefix_length}: {result}")
+    return result
