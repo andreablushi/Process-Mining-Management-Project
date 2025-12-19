@@ -480,13 +480,13 @@ def evaluate_recommendations(test_set: pd.DataFrame, recommendations: dict) -> d
             logger.debug(f"Trace {trace_id} was already positive; skipping recommendation evaluation.")
             continue
         
-        # If no recommendation was possible, skip the trace
+        recommendation_followed = True
+        # If no recommendation was possible, count as not followed, the next loop will be skipped implicitly since it's empty
         if recommendation == set():
             logger.debug(f"Trace {trace_id} has negative outcome, but no recommendation was possible.")
-            continue
+            recommendation_followed = False
             
         # Check if the recommendation was followed in the full trace
-        recommendation_followed = True
         for boolean_condition in recommendation:
             activity = boolean_condition.feature
 
