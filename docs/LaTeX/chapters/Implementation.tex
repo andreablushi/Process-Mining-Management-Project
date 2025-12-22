@@ -61,8 +61,8 @@ In particular, the \textit{class\_values} parameter was removed to simplify the 
 To extract all positive paths from the decision tree, we traversed the tree structure starting from the root node using a \textit{Depth-first search} (DFS) approach.
 At each decision node in the path, we recorded the feature, the operator (e.g., $\le$, $>$), and the threshold that leads to the next node.
 \\Upon reaching a leaf node, if the node's label corresponded to a positive outcome, the entire path, along with its associated confidence score, was stored as a positive path.
-\\The confidence score was a weighted measure based on the number of samples reaching each node.
-This was crucial to avoid generating recommendations from outlier paths that were not representative of the overall dataset.
+\\A weighted confidence score was introduced for decision tree paths to mitigate the issue of paths achieving a confidence of 1 with only a single supporting instance. 
+The weighting was based on the number of samples reaching each node, ensuring that recommendations were not derived from statistically unrepresentative outlier paths.
 
 \begin{algorithm}[H]
     \label{alg:get_positive_paths}
@@ -102,12 +102,12 @@ For each test set prefix, the recommendation set is defined as:
 \end{itemize}
 
 \subsection{Evaluation of Recommendations}
-To evaluate the quality of the generated recommendations, we compared them against the actual full traces in the test set, where the encoded test set served as the ground truth.
-\\\\The features of each full trace were matched against the recommendations generated for the corresponding prefixes.
-If a recommendation was defined as \textit{None}, it was skipped, as this indicates that no action was necessary because the trace was already predicted to have a positive outcome.
-Conversely, if a recommendation was an empty set, it was considered as not followed, since the system was unable to suggest any corrective action for that negative prediction.
-A recommendation was considered followed if and only if all the associated boolean conditions were satisfied in the full trace.
-Each condition specifies whether a given activity should be present or absent; if any single condition was violated, the recommendation was marked as not followed.
+To evaluate the quality of the generated recommendations, we compared them against the actual full traces in the test set, using the encoded test set as ground truth.
+For each trace in the test set, we matched it with its corresponding prefix and the recommendation generated for that prefix.
+\\\\If a recommendation was defined as \textit{None}, it was skipped, as this indicates that no action was necessary because the trace was already predicted to have a positive outcome.
+Conversely, if a recommendation was an empty set, it was considered \textit{not followed}, since the system was unable to suggest any corrective action for the negative prediction.
+A recommendation was considered \textit{followed} if and only if all the associated boolean conditions were satisfied in the full trace.
+Each condition specifies whether a given activity should be present or absent; if any single condition was violated, the recommendation was marked as \textit{not followed}.
 \\\\The recommendation outcome (followed or not followed) was then compared with the ground truth label of the trace to derive an approximated confusion matrix defined as follows:
 \begin{itemize}
     \item \textbf{True Positives}: the recommendation was followed in the actual trace and the ground truth outcome is positive.
